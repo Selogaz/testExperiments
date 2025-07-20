@@ -15,7 +15,7 @@ public class HelloServiceTest {
     }
 
     @Test
-    void testSayHello() {
+    void givenAlice_whenSayHello_thenHelloAlice() {
         String name = "Alice";
         HelloResponse response = helloService.sayHello(name);
 
