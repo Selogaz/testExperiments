@@ -35,6 +35,9 @@ public class OrderService {
             executor.submit(() -> {
                 try {
                     processOrder(order);
+                } catch (Exception e) {
+                    System.out.println("Ошибка при обработке заказа c id " + order.getId());
+                    e.printStackTrace();
                 } finally {
                     latch.countDown();
                 }

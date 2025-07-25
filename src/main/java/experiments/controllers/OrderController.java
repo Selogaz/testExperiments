@@ -23,7 +23,7 @@ public class OrderController {
     }
 
     @GetMapping("/process")
-    public List<OrderResponse> processOrders() throws InterruptedException {
+    public List<OrderResponse> getOrdersList() throws InterruptedException {
         return orderService.processOrders();
     }
 }
