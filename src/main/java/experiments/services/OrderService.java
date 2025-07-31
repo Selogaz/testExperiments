@@ -3,6 +3,9 @@ package experiments.services;
 import experiments.dto.OrderResponse;
 import experiments.model.OrderModel;
 import experiments.repository.OrderRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,14 +25,24 @@ public class OrderService {
     AtomicInteger orderCounter = new AtomicInteger(0);
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
+    private final Counter createdOrdersCounter;
+    private final Timer processOrdersTimer;
 
-    public OrderService(OrderRepository orderRepository) {
+
+    public OrderService(OrderRepository orderRepository, MeterRegistry meterRegistry) {
         this.orderRepository = orderRepository;
+        this.createdOrdersCounter = Counter.builder("orders.created")
+                .description("Total number of orders created")
+                .register(meterRegistry);
+        this.processOrdersTimer = Timer.builder("orders.processing.time")
+                .description("Time taken to process orders")
+                .register(meterRegistry);
     }
 
     public OrderResponse createOrder(String customerName, double amount) {
         OrderModel savedOrder = orderRepository.save(new OrderModel(null,
                 customerName, BigDecimal.valueOf(amount)));
+        createdOrdersCounter.increment();
         return mapToResponse(savedOrder);
     }
 
@@ -37,6 +50,7 @@ public class OrderService {
         List<OrderModel> orders = orderRepository.findAll();
         CountDownLatch latch = new CountDownLatch(orders.size());
 
+        return processOrdersTimer.record(() -> {
         for (OrderModel order : orders) {
             executor.submit(() -> {
                 try {
@@ -50,10 +64,15 @@ public class OrderService {
             });
         }
 
-        latch.await();
-        return orders.stream()
+            try {
+                latch.await();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            return orders.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+        });
     }
 
     private void processOrder(OrderModel order) {

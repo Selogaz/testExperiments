@@ -3,6 +3,8 @@ package experiments;
 import experiments.dto.OrderResponse;
 import experiments.repository.OrderRepository;
 import experiments.services.OrderService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,11 +22,13 @@ public class OrderServiceTest {
 
     private OrderRepository orderRepository;
     private OrderService orderService;
+    private MeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
         orderRepository = new OrderRepository();
-        orderService = new OrderService(orderRepository);
+        meterRegistry = new SimpleMeterRegistry();
+        orderService = new OrderService(orderRepository, meterRegistry);
     }
 
     @Test
@@ -66,5 +70,15 @@ public class OrderServiceTest {
 
         System.out.println("Всего заказов: " + responses.size());
         log.info("Заказы обработались за " + (System.currentTimeMillis() - start) + " ms");
+    }
+
+    @Test
+    @DisplayName("Test metrics for create order")
+    void givenOrder_whenCreateOrder_thenMetricsUpdated() {
+
+
+        orderService.createOrder("Alice", 100.0);
+
+        assertEquals(1, meterRegistry.counter("orders.created").count());
     }
 }
