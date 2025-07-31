@@ -3,6 +3,8 @@ package experiments.services;
 import experiments.dto.OrderResponse;
 import experiments.model.OrderModel;
 import experiments.repository.OrderRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -10,12 +12,16 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
     private final OrderRepository orderRepository;
     private final ExecutorService executor = Executors.newWorkStealingPool();
+    AtomicInteger orderCounter = new AtomicInteger(0);
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
+
 
     public OrderService(OrderRepository orderRepository) {
         this.orderRepository = orderRepository;
@@ -51,8 +57,12 @@ public class OrderService {
     }
 
     private void processOrder(OrderModel order) {
+        int currentCounter = orderCounter.incrementAndGet();
+        if (currentCounter % 10000 == 0) {
+            log.info("Обработано {} заказов", currentCounter);
+        }
         order.setProcessed(true);
-        System.out.println("Processed order ID: " + order.getId());
+
     }
 
     private OrderResponse mapToResponse(OrderModel order) {

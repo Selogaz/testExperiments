@@ -15,14 +15,15 @@ public class OrderRepository {
 
     public OrderModel save(OrderModel order) {
         try {
-            Long id = order.getId();
-            OrderModel newOrder = new OrderModel(idCounter.getAndIncrement(), order.getCustomerName(), order.getTotalAmount());
+            OrderModel newOrder = new OrderModel(idCounter.getAndIncrement(),
+                    order.getCustomerName(), order.getTotalAmount());
+            Long id = newOrder.getId();
             orders.put(id, newOrder);
             return newOrder;
         } catch (Exception e) {
             System.out.println("Ошибка при сохранении заказа с id " + order.getId());
             e.printStackTrace();
-            return null;
+            return new OrderModel(null,null,null);
         }
     }
 

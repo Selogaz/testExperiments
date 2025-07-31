@@ -6,13 +6,18 @@ import experiments.services.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class OrderServiceTest {
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceTest.class);
+
     private OrderRepository orderRepository;
     private OrderService orderService;
 
@@ -46,5 +51,20 @@ public class OrderServiceTest {
         }
 
         System.out.println("Total processed orders: " + responses.size());
+    }
+
+    @Test
+    @DisplayName("Create 10_000_000 orders")
+    void givenThousandOrders_whenProcessOrders_thenThousandOrders() throws InterruptedException {
+        long start = System.currentTimeMillis();
+        log.info("Создание заказов");
+        for (int i = 0; i < 10000000; i++) {
+            orderService.createOrder("Customer",150.0);
+        }
+        log.info("Начало проверки обработанных заказов");
+        List<OrderResponse> responses = orderService.processOrders();
+
+        System.out.println("Всего заказов: " + responses.size());
+        log.info("Заказы обработались за " + (System.currentTimeMillis() - start) + " ms");
     }
 }
