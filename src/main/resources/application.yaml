@@ -4,5 +4,17 @@ management:
       exposure:
         include: prometheus, health, metrics
   metrics:
+    export:
+      prometheus:
+        enabled: true
     tags:
       application: ${spring.application.name}
+logging:
+  level:
+    io.micrometer: DEBUG
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mydatabase
+    username: myuser
+    password: mypassword
+    driver-class-name: org.postgresql.Driver
