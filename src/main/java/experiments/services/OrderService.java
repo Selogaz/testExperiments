@@ -6,12 +6,8 @@ import experiments.repository.OrderRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -46,7 +42,7 @@ public class OrderService {
     }
 
     public OrderResponse createOrder(String customerName, double amount) {
-        OrderModel savedOrder = orderRepository.save(new OrderModel(null,
+        OrderModel savedOrder = orderRepository.saveOld(new OrderModel(null,
                 customerName, BigDecimal.valueOf(amount)));
         //log.info("Счетчик до увеличения {}", createdOrdersCounter.count());
         createdOrdersCounter.increment();
@@ -55,7 +51,7 @@ public class OrderService {
     }
 
     public List<OrderResponse> processOrders() throws InterruptedException {
-        List<OrderModel> orders = orderRepository.findAll();
+        List<OrderModel> orders = orderRepository.findAllOld();
         CountDownLatch latch = new CountDownLatch(orders.size());
 
         return processOrdersTimer.record(() -> {

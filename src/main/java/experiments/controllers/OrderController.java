@@ -2,7 +2,10 @@ package experiments.controllers;
 
 import experiments.dto.OrderRequest;
 import experiments.dto.OrderResponse;
+import experiments.model.OrderModel;
+import experiments.repository.OrderRepository;
 import experiments.services.OrderService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,10 +15,19 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderRepository orderRepository;
 
-    public OrderController(OrderService orderService) {
+    @Autowired
+    public OrderController(OrderService orderService, OrderRepository orderRepository) {
         this.orderService = orderService;
+        this.orderRepository = orderRepository;
     }
+
+    @GetMapping
+    public List<OrderModel> getAllOrders() {
+        return orderRepository.findAll();
+    }
+
 
     @PostMapping
     public OrderResponse createOrder(@RequestBody OrderRequest request) {

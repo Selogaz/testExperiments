@@ -19,4 +19,9 @@ public class OrderModel {
         this.totalAmount = totalAmount;
         this.isProcessed = false;
     }
+
+
+    public OrderModel() {
+
+    }
 }

@@ -1,19 +1,51 @@
 package experiments.repository;
 
+import experiments.dto.OrderRowMapper;
 import experiments.model.OrderModel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Repository
-public class OrderRepository {
+public class OrderRepository  {
     private final ConcurrentHashMap<Long, OrderModel> orders = new ConcurrentHashMap();
     private final AtomicLong idCounter = new AtomicLong(1);
+    private final JdbcTemplate jdbcTemplate;
 
-    public OrderModel save(OrderModel order) {
+    @Autowired
+    public OrderRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public List<OrderModel> findAll() {
+        String sql = "Select id, customer_name, total_amount, is_processed FROM orders";
+        return jdbcTemplate.query(sql, new OrderRowMapper());
+    }
+
+    public void save(OrderModel order) {
+        String sql = "INSERT INTO orders (customer_name, total_amount) VALUES (?,?)";
+        jdbcTemplate.update(sql, order.getCustomerName(), order.getTotalAmount());
+    }
+
+    public void deleteById(Long id) {
+        String sql = "DELETE FROM orders WHERE id = ?";
+        jdbcTemplate.update(sql, id);
+    }
+
+    public void deleteAll() {
+        String sql = "DELETE FROM orders";
+        jdbcTemplate.update(sql);
+    }
+
+    public OrderModel saveOld(OrderModel order) {
         try {
             OrderModel newOrder = new OrderModel(idCounter.getAndIncrement(),
                     order.getCustomerName(), order.getTotalAmount());
@@ -27,7 +59,7 @@ public class OrderRepository {
         }
     }
 
-    public List<OrderModel> findAll() {
+    public List<OrderModel> findAllOld() {
         return new ArrayList<>(orders.values());
     }
 
