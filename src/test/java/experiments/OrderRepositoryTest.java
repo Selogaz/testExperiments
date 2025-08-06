@@ -75,14 +75,12 @@ public class OrderRepositoryTest {
     @DisplayName("One sees changes")
     @Transactional(isolation = Isolation.READ_COMMITTED)
     void givenTwoReads_whenTransactionTwoCommitsChanges_thenOneSeesChanges() throws InterruptedException {
-        orderRepository.deleteAll();
-
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         executor.submit(()-> {
            List<OrderModel> firstList = orderRepository.findAll();
            for (OrderModel order : firstList) {
-               System.out.println("FirstRead: " + order.getId() + order.getCustomerName());
+               System.out.println("FirstRead A: " + order.getId() + order.getCustomerName());
            }
            try {
                 Thread.sleep(5000);
@@ -91,7 +89,7 @@ public class OrderRepositoryTest {
            }
            List<OrderModel> secondList = orderRepository.findAll();
             for (OrderModel order : secondList) {
-                System.out.println("SecondRead: " + order.getId() + " " + order.getCustomerName());
+                System.out.println("SecondRead A: " + order.getId() + " " + order.getCustomerName());
             }
         });
 
@@ -99,10 +97,88 @@ public class OrderRepositoryTest {
             try {
                 Thread.sleep(2000);
                 OrderModel bOrder = new OrderModel();
-                bOrder.setCustomerName("bCustomer");
+                bOrder.setCustomerName("read_commited");
                 bOrder.setTotalAmount(new BigDecimal(400));
                 orderRepository.save(bOrder);
-                System.out.println("TransactionTwo ended");
+                System.out.println("Transaction B ended");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("One does not see changes")
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public void givenTwoReads_whenTransactionTwoCommitsChanges_thenOneDoesNotSeeChanges() throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        executor.submit(()-> {
+            List<OrderModel> firstList = orderRepository.findAll();
+            for (OrderModel order : firstList) {
+                System.out.println("FirstRead A: " + order.getId() + " " + order.getCustomerName());
+            }
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            List<OrderModel> secondList = orderRepository.findAll();
+            for (OrderModel order : secondList) {
+                System.out.println("SecondRead A: " + order.getId() + " " + order.getCustomerName());
+            }
+        });
+
+        executor.submit(()-> {
+            try {
+                Thread.sleep(1000);
+                OrderModel bOrder = new OrderModel();
+                bOrder.setCustomerName("repeatable_read");
+                bOrder.setTotalAmount(new BigDecimal(400));
+                orderRepository.save(bOrder);
+                System.out.println("Transaction B ended");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+
+    @Test
+    @DisplayName("Serializable test")
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void givenTwoTransactions_whenSerializableConflict_thenThrowsSerializationException() throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        executor.submit(()-> {
+            List<OrderModel> firstList = orderRepository.findAll();
+            for (OrderModel order : firstList) {
+                System.out.println("FirstRead A: " + order.getId() + " " + order.getCustomerName());
+            }
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            List<OrderModel> secondList = orderRepository.findAll();
+            for (OrderModel order : secondList) {
+                System.out.println("SecondRead A: " + order.getId() + " " + order.getCustomerName());
+            }
+        });
+
+        executor.submit(()-> {
+            try {
+                Thread.sleep(1000);
+                OrderModel bOrder = new OrderModel();
+                bOrder.setCustomerName("serializable");
+                bOrder.setTotalAmount(new BigDecimal(400));
+                orderRepository.save(bOrder);
+                System.out.println("Transaction B ended");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -112,3 +188,5 @@ public class OrderRepositoryTest {
         executor.awaitTermination(5, TimeUnit.SECONDS);
     }
 }
+
+
