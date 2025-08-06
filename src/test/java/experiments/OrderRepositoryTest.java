@@ -4,15 +4,21 @@ import experiments.model.OrderModel;
 import experiments.repository.OrderRepository;
 import experiments.services.OrderService;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
 public class OrderRepositoryTest {
@@ -23,6 +29,8 @@ public class OrderRepositoryTest {
     public OrderRepositoryTest(OrderRepository orderRepository) {
         this.orderRepository = orderRepository;
     }
+
+
 
     @Test
     @DisplayName("jdbc test")
@@ -61,5 +69,46 @@ public class OrderRepositoryTest {
         //orderRepository.deleteAll();
 
 
+    }
+
+    @Test
+    @DisplayName("One sees changes")
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    void givenTwoReads_whenTransactionTwoCommitsChanges_thenOneSeesChanges() throws InterruptedException {
+        orderRepository.deleteAll();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        executor.submit(()-> {
+           List<OrderModel> firstList = orderRepository.findAll();
+           for (OrderModel order : firstList) {
+               System.out.println("FirstRead: " + order.getId() + order.getCustomerName());
+           }
+           try {
+                Thread.sleep(5000);
+           } catch (InterruptedException e) {
+               Thread.currentThread().interrupt();
+           }
+           List<OrderModel> secondList = orderRepository.findAll();
+            for (OrderModel order : secondList) {
+                System.out.println("SecondRead: " + order.getId() + " " + order.getCustomerName());
+            }
+        });
+
+        executor.submit(()-> {
+            try {
+                Thread.sleep(2000);
+                OrderModel bOrder = new OrderModel();
+                bOrder.setCustomerName("bCustomer");
+                bOrder.setTotalAmount(new BigDecimal(400));
+                orderRepository.save(bOrder);
+                System.out.println("TransactionTwo ended");
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        executor.shutdown();
+        executor.awaitTermination(5, TimeUnit.SECONDS);
     }
 }
