@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -19,16 +20,19 @@ public class OrderRepository  {
     private final ConcurrentHashMap<Long, OrderModel> orders = new ConcurrentHashMap();
     private final AtomicLong idCounter = new AtomicLong(1);
     private final JdbcTemplate jdbcTemplate;
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
-    public OrderRepository(JdbcTemplate jdbcTemplate) {
+    public OrderRepository(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public List<OrderModel> findAll() {
         String sql = "Select id, customer_name, total_amount, is_processed FROM orders";
         return jdbcTemplate.query(sql, new OrderRowMapper());
     }
+
 
     public void save(OrderModel order) {
         String sql = "INSERT INTO orders (customer_name, total_amount) VALUES (?,?)";
@@ -43,6 +47,15 @@ public class OrderRepository  {
     public void deleteAll() {
         String sql = "DELETE FROM orders";
         jdbcTemplate.update(sql);
+    }
+
+    public void executeWithIsolation(int isolationLevel, Runnable operation) {
+        TransactionTemplate template = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        template.setIsolationLevel(isolationLevel);
+        template.execute(status -> {
+            operation.run();
+            return null;
+        });
     }
 
     public OrderModel saveOld(OrderModel order) {

@@ -26,15 +26,11 @@ import java.util.concurrent.TimeUnit;
 public class OrderRepositoryTest {
 
     private OrderRepository orderRepository;
-    private TransactionTemplate transactionTemplate;
 
     @Autowired
     public OrderRepositoryTest(OrderRepository orderRepository, TransactionTemplate transactionTemplate) {
         this.orderRepository = orderRepository;
-        this.transactionTemplate = transactionTemplate;
     }
-
-
 
     @Test
     @DisplayName("jdbc test")
@@ -77,41 +73,8 @@ public class OrderRepositoryTest {
 
     @Test
     @DisplayName("One sees changes")
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     void givenTwoReads_whenTransactionTwoCommitsChanges_thenOneSeesChanges() throws InterruptedException {
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-
-        executor.submit(()-> {
-           List<OrderModel> firstList = orderRepository.findAll();
-           for (OrderModel order : firstList) {
-               System.out.println("Transaction A - First Read: " + order.getId() + order.getCustomerName());
-           }
-           try {
-                Thread.sleep(5000);
-           } catch (InterruptedException e) {
-               Thread.currentThread().interrupt();
-           }
-           List<OrderModel> secondList = orderRepository.findAll();
-            for (OrderModel order : secondList) {
-                System.out.println("Transaction A - Second Read: " + order.getId() + " " + order.getCustomerName());
-            }
-        });
-
-        executor.submit(()-> {
-            try {
-                Thread.sleep(2000);
-                OrderModel bOrder = new OrderModel();
-                bOrder.setCustomerName("read_commited");
-                bOrder.setTotalAmount(new BigDecimal(400));
-                orderRepository.save(bOrder);
-                System.out.println("Transaction B - New order saved");
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
-
-        executor.shutdown();
-        executor.awaitTermination(5, TimeUnit.SECONDS);
+        testIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
     @Test
@@ -127,16 +90,10 @@ public class OrderRepositoryTest {
     }
 
     private void testIsolationLevel(int isolationLevel) throws InterruptedException {
-        TransactionTemplate templateA = new TransactionTemplate(transactionTemplate.getTransactionManager());
-        templateA.setIsolationLevel(isolationLevel);
-
-        TransactionTemplate templateB = new TransactionTemplate(transactionTemplate.getTransactionManager());
-        templateB.setIsolationLevel(isolationLevel);
-
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         executor.submit(() -> {
-            templateA.execute(status -> {
+            orderRepository.executeWithIsolation(isolationLevel, () -> {
                 List<OrderModel> firstList = orderRepository.findAll();
                 for (OrderModel order : firstList) {
                     System.out.println("Transaction A - First Read: " + order.getId() + " " + order.getCustomerName());
@@ -150,26 +107,22 @@ public class OrderRepositoryTest {
                 for (OrderModel order : secondList) {
                     System.out.println("Transaction A - Second Read: " + order.getId() + " " + order.getCustomerName());
                 }
-
-                return null;
             });
         });
 
         executor.submit(() -> {
-            templateB.execute(status -> {
+            orderRepository.executeWithIsolation(isolationLevel, () -> {
                 try {
-                    Thread.sleep(1000); // Ждём, пока транзакция A начнёт чтение
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
 
                 OrderModel bOrder = new OrderModel();
-                bOrder.setCustomerName("serializable");
+                bOrder.setCustomerName("test name");
                 bOrder.setTotalAmount(new BigDecimal(400));
                 orderRepository.save(bOrder);
                 System.out.println("Transaction B - New order saved");
-
-                return null;
             });
         });
 
