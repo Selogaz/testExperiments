@@ -106,8 +106,9 @@ public class OrderRepositoryTest {
             orderRepository.executeWithIsolation(isolationLevel, () -> {
                 try {
                     System.out.println("BEGIN ISOLATION LEVEL SERIALIZABLE");
-                    Thread.sleep(100);
+                    latch.await();
 
+                    Thread.sleep(100);
                     System.out.println("Transaction A - SELECT");
                     OrderModel newOrderModel = orderRepository.findById(55L);
                     System.out.println("Transaction A - READ " + newOrderModel.getTotalAmount());
@@ -133,14 +134,15 @@ public class OrderRepositoryTest {
                 orderRepository.executeWithIsolation(isolationLevel, () -> {
                 try {
                     System.out.println("BEGIN ISOLATION LEVEL SERIALIZABLE");
-                    Thread.sleep(100);
+                    latch.countDown();
 
+                    Thread.sleep(100);
                     System.out.println("Transaction B - SELECT");
                     OrderModel newOrderModel = orderRepository.findById(55L);
                     System.out.println("Transaction B - READ " + newOrderModel.getTotalAmount());
 
                     latch.countDown();
-                    Thread.sleep(5000);
+                    Thread.sleep(500);
                     newOrderModel.setTotalAmount(new BigDecimal(200));
                     orderRepository.update(newOrderModel);
                     System.out.println("Transaction B - UPDATE "+ newOrderModel.getTotalAmount());
