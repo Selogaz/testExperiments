@@ -1,11 +1,15 @@
 package experiments.repository;
 
+import com.zaxxer.hikari.util.IsolationLevel;
+import experiments.config.TransactionTemplateConfig;
 import experiments.dto.OrderRowMapper;
 import experiments.model.OrderModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.TransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.ResultSet;
@@ -20,7 +24,7 @@ public class OrderRepository  {
     private final ConcurrentHashMap<Long, OrderModel> orders = new ConcurrentHashMap();
     private final AtomicLong idCounter = new AtomicLong(1);
     private final JdbcTemplate jdbcTemplate;
-    private TransactionTemplate transactionTemplate;
+    private final TransactionTemplate transactionTemplate;
 
     @Autowired
     public OrderRepository(JdbcTemplate jdbcTemplate, TransactionTemplate transactionTemplate) {
@@ -33,10 +37,27 @@ public class OrderRepository  {
         return jdbcTemplate.query(sql, new OrderRowMapper());
     }
 
+    public OrderModel findById(Long id) {
+        String sql = "Select id, customer_name, total_amount, is_processed FROM orders WHERE id = ? FOR UPDATE";
+        return jdbcTemplate.queryForObject(sql, new OrderRowMapper(),id);
+    }
 
     public void save(OrderModel order) {
         String sql = "INSERT INTO orders (customer_name, total_amount) VALUES (?,?)";
-        jdbcTemplate.update(sql, order.getCustomerName(), order.getTotalAmount());
+//        String sql = "INSERT INTO orders (id, customer_name, total_amount)" +
+//                "        VALUES (?, ?, ?)" +
+//                "        ON CONFLICT (id)" +
+//                "        DO UPDATE SET" +
+//                "            customer_name = EXCLUDED.customer_name";
+        jdbcTemplate.update(sql, order.getId(), order.getCustomerName(), order.getTotalAmount());
+    }
+
+    @Transactional
+    public void update(OrderModel order) {
+        String sql = "UPDATE orders " +
+                "SET customer_name = ?, total_amount = ? " +
+                "WHERE id = ?";
+        jdbcTemplate.update(sql, order.getCustomerName(), order.getTotalAmount(),order.getId());
     }
 
     public void deleteById(Long id) {
@@ -50,11 +71,17 @@ public class OrderRepository  {
     }
 
     public void executeWithIsolation(int isolationLevel, Runnable operation) {
-        TransactionTemplate template = new TransactionTemplate(transactionTemplate.getTransactionManager());
-        template.setIsolationLevel(isolationLevel);
-        template.execute(status -> {
-            operation.run();
-            return null;
+        TransactionTemplate transactionTemplateCustom = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        transactionTemplateCustom.setIsolationLevel(isolationLevel);
+        transactionTemplateCustom.execute(status -> {
+            try {
+                operation.run();
+                return null;
+            } catch (Exception e) {
+                status.setRollbackOnly();
+                throw e;
+            }
+
         });
     }
 

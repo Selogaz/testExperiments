@@ -18,14 +18,20 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
 public class OrderRepositoryTest {
 
     private OrderRepository orderRepository;
+
 
     @Autowired
     public OrderRepositoryTest(OrderRepository orderRepository, TransactionTemplate transactionTemplate) {
@@ -91,43 +97,73 @@ public class OrderRepositoryTest {
 
     private void testIsolationLevel(int isolationLevel) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(2);
+        //orderRepository.save(new OrderModel(55L,"new customer",new BigDecimal(600)));
+        ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+        AtomicInteger successCount = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
 
         executor.submit(() -> {
             orderRepository.executeWithIsolation(isolationLevel, () -> {
-                List<OrderModel> firstList = orderRepository.findAll();
-                for (OrderModel order : firstList) {
-                    System.out.println("Transaction A - First Read: " + order.getId() + " " + order.getCustomerName());
-                }
                 try {
-                    Thread.sleep(4000);
+                    System.out.println("BEGIN ISOLATION LEVEL SERIALIZABLE");
+                    Thread.sleep(100);
+
+                    System.out.println("Transaction A - SELECT");
+                    OrderModel newOrderModel = orderRepository.findById(55L);
+                    System.out.println("Transaction A - READ " + newOrderModel.getTotalAmount());
+                    Thread.sleep(500);
+
+                    latch.await();
+                    newOrderModel.setTotalAmount(new BigDecimal(200));
+                    orderRepository.update(newOrderModel);
+                    System.out.println("Transaction A - UPDATE "+ newOrderModel.getTotalAmount());
+
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                }
-                List<OrderModel> secondList = orderRepository.findAll();
-                for (OrderModel order : secondList) {
-                    System.out.println("Transaction A - Second Read: " + order.getId() + " " + order.getCustomerName());
+                } catch (Exception e) {
+                    System.err.println("Transaction A - ERROR: " + e.getMessage());
+                    e.printStackTrace();
                 }
             });
+            successCount.incrementAndGet();
         });
 
         executor.submit(() -> {
-            orderRepository.executeWithIsolation(isolationLevel, () -> {
+            try {
+                orderRepository.executeWithIsolation(isolationLevel, () -> {
                 try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+                    System.out.println("BEGIN ISOLATION LEVEL SERIALIZABLE");
+                    Thread.sleep(100);
 
-                OrderModel bOrder = new OrderModel();
-                bOrder.setCustomerName("test name");
-                bOrder.setTotalAmount(new BigDecimal(400));
-                orderRepository.save(bOrder);
-                System.out.println("Transaction B - New order saved");
+                    System.out.println("Transaction B - SELECT");
+                    OrderModel newOrderModel = orderRepository.findById(55L);
+                    System.out.println("Transaction B - READ " + newOrderModel.getTotalAmount());
+
+                    latch.countDown();
+                    Thread.sleep(5000);
+                    newOrderModel.setTotalAmount(new BigDecimal(200));
+                    orderRepository.update(newOrderModel);
+                    System.out.println("Transaction B - UPDATE "+ newOrderModel.getTotalAmount());
+
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             });
+            successCount.incrementAndGet();
+            } catch (Exception e) {
+                System.err.println("Transaction B - ERROR: " + e.getMessage());
+                if (e.getMessage().contains("could not serialize")) {
+                    System.out.println("✅ SerializationException caught! ROLLBACK occurred.");
+                }
+                e.printStackTrace();
+            }
         });
 
         executor.shutdown();
-        executor.awaitTermination(5, TimeUnit.SECONDS);
+        executor.awaitTermination(100, TimeUnit.SECONDS);
+
+        assertEquals(1, successCount.get());
+
     }
 }
 

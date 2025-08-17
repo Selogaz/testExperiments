@@ -28,7 +28,6 @@ public class OrderService {
     private final Counter createdOrdersCounter;
     private final Timer processOrdersTimer;
 
-
     public OrderService(OrderRepository orderRepository, MeterRegistry meterRegistry) {
         this.orderRepository = orderRepository;
         this.createdOrdersCounter = Counter.builder("orders.created")
