@@ -1,7 +1,7 @@
-package experiments.controllers;
+package hello.controllers;
 
-import experiments.dto.HelloResponse;
-import experiments.services.HelloService;
+import hello.dto.HelloResponse;
+import hello.services.HelloService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;

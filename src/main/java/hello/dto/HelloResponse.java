@@ -1,4 +1,4 @@
-package experiments.dto;
+package hello.dto;
 
 public class HelloResponse {
     private String message;

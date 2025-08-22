@@ -1,5 +1,7 @@
-import experiments.dto.HelloResponse;
-import experiments.services.HelloService;
+package hello;
+
+import hello.dto.HelloResponse;
+import hello.services.HelloService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

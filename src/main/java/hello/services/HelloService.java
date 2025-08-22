@@ -1,6 +1,6 @@
-package experiments.services;
+package hello.services;
 
-import experiments.dto.HelloResponse;
+import hello.dto.HelloResponse;
 import org.springframework.stereotype.Service;
 
 @Service
